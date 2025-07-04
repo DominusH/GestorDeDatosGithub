@@ -6,7 +6,7 @@ def eliminar_usuarios():
     with gestor.app_context():
         try:
             # Lista de correos a eliminar
-            correos = ["matvaltino@gmail.com", "walter.vega@galeno.com"]
+            correos = ["matvaltino@gmail.com", "walter.vega@galeno.com.ar"]
             
             # Buscar y eliminar cada usuario
             for correo in correos:

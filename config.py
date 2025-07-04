@@ -5,13 +5,9 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-USER = os.getenv("user")
-PASSWORD = os.getenv("password")
-HOST = os.getenv("host")
-PORT = os.getenv("port")
-DBNAME = os.getenv("dbname")
-
-SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
+# Configuración de base de datos - Usar SQLite exclusivamente
+basedir = os.path.abspath(os.path.dirname(__file__))
+SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'contactos.db')}"
 
 class Config:
     # Configuración básica
@@ -48,4 +44,4 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
 
 # Lista de correos autorizados como administradores
-ADMIN_EMAILS = ["matvaltino@gmail.com", "walter.vega@galeno.com"] 
+ADMIN_EMAILS = ["matvaltino@gmail.com", "walter.vega@galeno.com.ar"] 

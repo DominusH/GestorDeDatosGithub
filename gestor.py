@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import os
-from flask import Flask, redirect, url_for, render_template, session, send_file, flash, request, jsonify
+from flask import Flask, redirect, url_for, render_template, session, send_file, flash, request, jsonify, Response, make_response
 from auth import auth_bp 
 from models import db, Usuario
 from form import ContactoForm
@@ -102,10 +102,22 @@ def load_user(user_id):
     except (ValueError, TypeError):
         return None
 
-# Crear la base de datos
+# Crear la base de datos SQLite
 with gestor.app_context():
     from models import Contacto
-    db.create_all() 
+    try:
+        # Asegurar que el directorio instance existe para SQLite
+        instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+        if not os.path.exists(instance_path):
+            os.makedirs(instance_path)
+            logging.info(f"Directorio instance creado: {instance_path}")
+        
+        db.create_all()
+        logging.info("Base de datos SQLite creada/verificada exitosamente")
+        
+    except Exception as e:
+        logging.error(f"Error al crear la base de datos SQLite: {str(e)}")
+        # Continuar sin la base de datos para evitar que la aplicación falle completamente
 
 # Configurar manejo de usuarios anónimos
 login_manager.anonymous_user = Anonymous
@@ -745,5 +757,54 @@ def verificar_email():
 def terminos():
     return render_template('terminos.html')
 
+@gestor.route('/robots.txt')
+def robots_txt():
+    """Servir archivo robots.txt para bloquear motores de búsqueda"""
+    return Response(
+        "User-agent: *\nDisallow: /\n\n"
+        "User-agent: Googlebot\nDisallow: /\n\n"
+        "User-agent: Bingbot\nDisallow: /\n\n"
+        "User-agent: Slurp\nDisallow: /\n\n"
+        "User-agent: Yandex\nDisallow: /\n\n"
+        "User-agent: DuckDuckBot\nDisallow: /\n\n"
+        "User-agent: Baiduspider\nDisallow: /\n\n"
+        "User-agent: Sogou\nDisallow: /\n\n"
+        "Noindex: /",
+        mimetype='text/plain'
+    )
+
+@gestor.route('/sitemap.xml')
+def sitemap_xml():
+    """Servir sitemap.xml vacío para evitar indexación"""
+    return Response(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '</urlset>',
+        mimetype='application/xml'
+    )
+
+# Middleware para agregar headers de seguridad y privacidad
+@gestor.before_request
+def add_security_headers():
+    """Agregar headers para evitar indexación y mejorar seguridad"""
+    # Solo agregar headers si no es una solicitud de archivos estáticos
+    if not request.path.startswith('/static/'):
+        response = make_response()
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive, nosnippet, noimageindex'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
 if __name__ == '__main__':
-    gestor.run(host='0.0.0.0', port=5555, debug=False)
+    # Solo ejecutar en desarrollo local, no en PythonAnywhere
+    import socket
+    hostname = socket.gethostname()
+    
+    if 'liveconsole' not in hostname and 'pythonanywhere' not in hostname.lower():
+        gestor.run(host='0.0.0.0', port=5555, debug=False)
+    else:
+        print("Aplicación configurada para PythonAnywhere")
