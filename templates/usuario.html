@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Usuario - Gestor de Contactos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1F4E78;
+            --secondary-color: #E2EFDA;
+            --accent-color: #4472C4;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: 600;
+        }
+
+        .user-info {
+            color: white;
+            margin-right: 1rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: white;
+            margin-bottom: 2rem;
+        }
+
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 1rem;
+        }
+
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border: none;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 0.2rem rgba(68, 114, 196, 0.25);
+        }
+
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .export-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .export-btn:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+
+        .form-label {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Estilos para la tabla con scrollbar arriba */
+        .table-wrapper {
+            max-height: 600px;
+            overflow: auto;
+            direction: rtl;
+        }
+
+        .table-wrapper table {
+            direction: ltr;
+        }
+
+        /* Estilos para la scrollbar */
+        .table-wrapper::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color);
+        }
+
+        /* Asegurar que el encabezado de la tabla se mantenga fijo */
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background-color: var(--primary-color);
+            z-index: 1;
+        }
+
+        .badge {
+            padding: 0.5em 1em;
+            font-size: 0.85em;
+            border-radius: 20px;
+        }
+
+        .badge-abierto {
+            background-color: #28a745;
+        }
+
+        .badge-cerrado {
+            background-color: #dc3545;
+        }
+
+        .badge-vendido {
+            background-color: #17a2b8;
+        }
+
+        .badge-no-responde {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .estado-btn {
+            padding: 0.25rem 0.5rem;
+            border: none;
+            background: transparent;
+        }
+
+        .estado-btn:hover {
+            background-color: rgba(31, 78, 120, 0.1);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .dropdown-item.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Estilos para los campos "otros" */
+        .otros-field {
+            display: none;
+            margin-top: 0.5rem;
+        }
+
+        .otros-field.show {
+            display: block;
+        }
+
+        .select-group {
+            background-color: #f8f9fa;
+            border: 1px solid rgba(31, 78, 120, 0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+        }
+
+        .select-group h4 {
+            color: var(--primary-color);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .select-group h4 i {
+            color: var(--accent-color);
+        }
+
+        /* Estilos para validación de campos select */
+        select.is-invalid {
+            border-color: #dc3545;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+
+        .select-error {
+            display: none;
+            margin-top: 0.25rem;
+            font-size: 0.875em;
+            color: #dc3545;
+        }
+
+        select.is-invalid + .select-error {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-address-book me-2"></i>
+                Gestor de Contactos
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="user-info">
+                    <i class="fas fa-user me-2"></i>
+                    {{ current_user.email }}
+                </span>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    Cerrar sesión
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Formulario de contacto -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Agregar Nuevo Contacto
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if form.errors %}
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        {% for field, errors in form.errors.items() %}
+                            {% for error in errors %}
+                            <li>{{ form[field].label.text }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="post" autocomplete="off">
+                    {{ form.hidden_tag() }}
+                    
+                    <!-- Campos Select -->
+                    <div class="select-group">
+                        <h4><i class="fas fa-list-ul me-2"></i>Información de Origen y Cobertura</h4>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.origen.label(class="form-label") }}
+                                {{ form.origen(class="form-select") }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.cobertura_actual.label(class="form-label") }}
+                                {{ form.cobertura_actual(class="form-select") }}
+                                <div class="otros-field" id="cobertura_actual_otra_field">
+                                    {{ form.cobertura_actual_otra(class="form-control", placeholder="Especifique la cobertura") }}
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.promocion.label(class="form-label") }}
+                                {{ form.promocion(class="form-select") }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.privadoDesregulado.label(class="form-label") }}
+                                {{ form.privadoDesregulado(class="form-select") }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.estado.label(class="form-label") }}
+                                {{ form.estado(class="form-select") }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.conyuge.label(class="form-label") }}
+                                {{ form.conyuge(class="form-select") }}
+                                <div class="otros-field" id="conyuge_edad_field">
+                                    {{ form.conyuge_edad(class="form-control", placeholder="Edad del cónyuge") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos Personales -->
+                    <div class="select-group">
+                        <h4><i class="fas fa-user me-2"></i>Datos Personales</h4>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.apellido_nombre.label(class="form-label") }}
+                                {{ form.apellido_nombre(class="form-control") }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.correo_electronico.label(class="form-label") }}
+                                {{ form.correo_electronico(class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.edad_titular.label(class="form-label") }}
+                                {{ form.edad_titular(class="form-control") }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.telefono.label(class="form-label") }}
+                                {{ form.telefono(class="form-control") }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.grupo_familiar.label(class="form-label") }}
+                                {{ form.grupo_familiar(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Información del Plan -->
+                    <div class="select-group">
+                        <h4><i class="fas fa-file-medical me-2"></i>Información del Plan</h4>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.plan_ofrecido.label(class="form-label") }}
+                                {{ form.plan_ofrecido(class="form-control") }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.fecha.label(class="form-label") }}
+                                {{ form.fecha(class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.observaciones.label(class="form-label") }}
+                            {{ form.observaciones(class="form-control", rows="3") }}
+                        </div>
+                    </div>
+
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </form>
+            </div>
+        </div>
+
+        <!-- Tabla de contactos -->
+        {% if contactos_usuario %}
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">
+                    <i class="fas fa-table me-2"></i>
+                    Mis Contactos
+                </h3>
+                <a href="{{ url_for('exportar_mis_contactos') }}" class="export-btn">
+                    <i class="fas fa-file-excel me-2"></i>
+                    Exportar a Excel
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Origen</th>
+                                <th>Privado/Desregulado</th>
+                                <th>Apellido y nombre</th>
+                                <th>Correo electrónico</th>
+                                <th>Edad titular</th>
+                                <th>Teléfono</th>
+                                <th>Grupo familiar</th>
+                                <th>Cobertura actual</th>
+                                <th>¿Por qué no toma la cobertura?</th>
+                                <th>Plan ofrecido</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Cónyuge</th>
+                                <th>Edad cónyuge</th>
+                                <th>Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in contactos_usuario %}
+                            <tr>
+                                <td>{{ c.origen }}</td>
+                                <td>{{ c.privadoDesregulado }}</td>
+                                <td>{{ c.apellido_nombre }}</td>
+                                <td>{{ c.correo_electronico }}</td>
+                                <td>{{ c.edad_titular }}</td>
+                                <td>{{ c.telefono }}</td>
+                                <td>{{ c.grupo_familiar }}</td>
+                                <td>{{ c.cobertura_actual }}</td>
+                                <td>{{ c.promocion or 'No especificado' }}</td>
+                                <td>{{ c.plan_ofrecido }}</td>
+                                <td>{{ c.fecha }}</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm dropdown-toggle estado-btn" 
+                                                type="button" 
+                                                data-bs-toggle="dropdown" 
+                                                aria-expanded="false"
+                                                data-contacto-id="{{ c.id }}"
+                                                data-estado-actual="{{ c.estado }}">
+                                            <span class="badge {% if c.estado == 'abierto' %}badge-abierto{% elif c.estado == 'vendido' %}badge-vendido{% elif c.estado == 'no responde' %}badge-no-responde{% else %}badge-cerrado{% endif %}">
+                                                {{ c.estado }}
+                                            </span>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item estado-option" href="#" data-estado="abierto">Abierto</a></li>
+                                            <li><a class="dropdown-item estado-option" href="#" data-estado="cerrado">Cerrado</a></li>
+                                            <li><a class="dropdown-item estado-option" href="#" data-estado="no responde">No responde</a></li>
+                                            <li><a class="dropdown-item estado-option" href="#" data-estado="vendido">Vendido</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                                <td>{{ c.conyuge }}</td>
+                                <td>{{ c.conyuge_edad }}</td>
+                                <td>{{ c.observaciones }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Función para manejar la visibilidad de los campos "otros"
+        function handleOtrosField(selectId, otrosFieldId) {
+            const select = document.getElementById(selectId);
+            const otrosField = document.getElementById(otrosFieldId);
+            
+            if (select && otrosField) {
+                select.addEventListener('change', function() {
+                    if (selectId === 'conyuge') {
+                        otrosField.classList.toggle('show', this.value === 'con conyuge');
+                    } else {
+                        otrosField.classList.toggle('show', this.value === 'otros');
+                    }
+                    validateSelect(this);
+                });
+                
+                // Inicializar estado
+                if (selectId === 'conyuge') {
+                    otrosField.classList.toggle('show', select.value === 'con conyuge');
+                } else {
+                    otrosField.classList.toggle('show', select.value === 'otros');
+                }
+            }
+        }
+
+        // Función para validar campos select
+        function validateSelect(selectElement) {
+            // No validar el campo de promoción
+            if (selectElement.id === 'promocion') {
+                return;
+            }
+
+            const errorDiv = selectElement.nextElementSibling;
+            if (!errorDiv || !errorDiv.classList.contains('select-error')) {
+                const div = document.createElement('div');
+                div.className = 'select-error text-danger small mt-1';
+                selectElement.parentNode.insertBefore(div, selectElement.nextSibling);
+            }
+            
+            if (!selectElement.value) {
+                selectElement.classList.add('is-invalid');
+                selectElement.nextElementSibling.textContent = 'Por favor seleccione una opción';
+            } else {
+                selectElement.classList.remove('is-invalid');
+                selectElement.nextElementSibling.textContent = '';
+            }
+        }
+
+        // Configurar los manejadores para cada campo select
+        document.addEventListener('DOMContentLoaded', function() {
+            handleOtrosField('cobertura_actual', 'cobertura_actual_otra_field');
+            handleOtrosField('conyuge', 'conyuge_edad_field');
+
+            // Validar campos select al enviar el formulario
+            document.querySelector('form').addEventListener('submit', function(e) {
+                const selects = this.querySelectorAll('select');
+                let isValid = true;
+                
+                selects.forEach(select => {
+                    // No validar el campo de promoción
+                    if (select.id !== 'promocion' && !select.value) {
+                        validateSelect(select);
+                        isValid = false;
+                    }
+                });
+                
+                if (!isValid) {
+                    e.preventDefault();
+                }
+            });
+
+            // Auto-ocultar mensajes flash después de 3 segundos
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    // Crear un evento de bootstrap para cerrar la alerta
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 3000);
+            });
+
+            // Manejar cambio de estado de contactos
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('estado-option')) {
+                    e.preventDefault();
+                    
+                    const contactoId = e.target.closest('.dropdown').querySelector('.estado-btn').dataset.contactoId;
+                    const estadoActual = e.target.closest('.dropdown').querySelector('.estado-btn').dataset.estadoActual;
+                    const nuevoEstado = e.target.dataset.estado;
+                    
+                    // No hacer nada si el estado es el mismo
+                    if (estadoActual === nuevoEstado) {
+                        return;
+                    }
+                    
+                    // Confirmar el cambio
+                    const confirmacion = confirm(`¿Estás seguro de que quieres cambiar el estado de "${estadoActual}" a "${nuevoEstado}"?`);
+                    
+                    if (confirmacion) {
+                        // Mostrar indicador de carga
+                        const btn = e.target.closest('.dropdown').querySelector('.estado-btn');
+                        const badge = btn.querySelector('.badge');
+                        const originalBadgeText = badge ? badge.textContent : '';
+                        const originalBadgeHTML = badge ? badge.outerHTML : '';
+                        
+                        // Guardar el badge original y mostrar spinner
+                        if (badge) {
+                            badge.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                        }
+                        btn.disabled = true;
+                        
+                        // Obtener el token CSRF del formulario
+                        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                        
+                        // Enviar solicitud al servidor
+                        fetch('/cambiar_estado_contacto', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: `contacto_id=${contactoId}&nuevo_estado=${nuevoEstado}&csrf_token=${csrfToken}`
+                        })
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Response data:', data);
+                            if (data.success) {
+                                // Actualizar el botón con el nuevo estado
+                                console.log('Actualizando badge para contacto:', contactoId);
+                                console.log('Botón encontrado:', btn);
+                                
+                                // Buscar el badge dentro del botón
+                                const badge = btn.querySelector('.badge');
+                                console.log('Badge encontrado:', badge);
+                                
+                                if (badge) {
+                                    console.log('Estado anterior del badge:', badge.textContent);
+                                    // Actualizar el texto del badge
+                                    badge.textContent = nuevoEstado;
+                                    console.log('Estado nuevo del badge:', badge.textContent);
+                                    
+                                    // Limpiar todas las clases anteriores
+                                    badge.className = 'badge';
+                                    
+                                    // Aplicar la clase de color correspondiente
+                                    if (nuevoEstado === 'abierto') {
+                                        badge.classList.add('badge-abierto');
+                                    } else if (nuevoEstado === 'vendido') {
+                                        badge.classList.add('badge-vendido');
+                                    } else if (nuevoEstado === 'no responde') {
+                                        badge.classList.add('badge-no-responde');
+                                    } else if (nuevoEstado === 'cerrado') {
+                                        badge.classList.add('badge-cerrado');
+                                    }
+                                    
+                                    // Actualizar el dataset del botón
+                                    btn.dataset.estadoActual = nuevoEstado;
+                                    
+                                    console.log('Badge actualizado exitosamente - Texto:', badge.textContent, 'Clases:', badge.className);
+                                    mostrarMensaje(data.message, 'success');
+                                } else {
+                                    console.error('No se encontró el elemento badge en el botón');
+                                    console.log('Contenido del botón:', btn.innerHTML);
+                                    mostrarMensaje('Estado actualizado pero error al actualizar la interfaz', 'warning');
+                                }
+                            } else {
+                                mostrarMensaje(data.message || 'Error desconocido', 'danger');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error completo:', error);
+                            mostrarMensaje(`Error al actualizar el estado: ${error.message}`, 'danger');
+                        })
+                        .finally(() => {
+                            // Solo restaurar si hubo error (no si fue exitoso)
+                            if (badge && !data?.success) {
+                                badge.textContent = originalBadgeText;
+                            }
+                            btn.disabled = false;
+                        });
+                    }
+                }
+            });
+
+            // Función para mostrar mensajes
+            function mostrarMensaje(mensaje, tipo) {
+                try {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = `alert alert-${tipo} alert-dismissible fade show`;
+                    alertDiv.innerHTML = `
+                        ${mensaje}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    
+                    // Buscar específicamente la card de "Mis contactos"
+                    const cards = document.querySelectorAll('.card');
+                    let contactosCard = null;
+                    
+                    for (let card of cards) {
+                        const header = card.querySelector('.card-header h3');
+                        if (header && header.textContent.trim().includes('Mis Contactos')) {
+                            contactosCard = card;
+                            break;
+                        }
+                    }
+                    
+                    // Fallback a la segunda card si no se encuentra
+                    if (!contactosCard && cards.length > 1) {
+                        contactosCard = cards[1];
+                    }
+                    
+                    if (contactosCard) {
+                        // Insertar al principio de la card de contactos
+                        const cardBody = contactosCard.querySelector('.card-body');
+                        if (cardBody) {
+                            cardBody.insertBefore(alertDiv, cardBody.firstChild);
+                        } else {
+                            // Si no hay card-body, insertar después del header
+                            contactosCard.appendChild(alertDiv);
+                        }
+                    } else {
+                        // Fallback: insertar al principio del contenedor principal
+                        const container = document.querySelector('.container');
+                        if (container) {
+                            container.insertBefore(alertDiv, container.firstChild);
+                        } else {
+                            // Último fallback: insertar en el body
+                            document.body.appendChild(alertDiv);
+                        }
+                    }
+                    
+                    // Auto-ocultar después de 3 segundos
+                    setTimeout(() => {
+                        try {
+                            const bsAlert = new bootstrap.Alert(alertDiv);
+                            bsAlert.close();
+                        } catch (e) {
+                            console.error('Error al cerrar alerta:', e);
+                            alertDiv.remove();
+                        }
+                    }, 3000);
+                } catch (error) {
+                    console.error('Error al mostrar mensaje:', error);
+                    // Fallback simple
+                    alert(mensaje);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
