@@ -1,5 +1,5 @@
 """
-Script para reiniciar la base de datos SQLite
+Script para reiniciar la base de datos SQLite - Versión Windows
 Elimina todos los contactos y opcionalmente todos los usuarios
 """
 

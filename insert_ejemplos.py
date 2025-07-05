@@ -4,18 +4,23 @@ from datetime import datetime, timedelta
 import random
 from werkzeug.security import generate_password_hash
 
-# Datos de ejemplo
-origenes = ['referido', 'redes', 'web', 'otros']
-origenes_otros = ['Evento corporativo', 'Feria de salud', 'Recomendación médica']
+# Datos de ejemplo actualizados según el formulario
+origenes = ['propio', 'elegi mejor', 'wise', 'guardia', 'broker']
 
-coberturas = ['osde', 'swiss', 'galeno', 'otros']
-coberturas_otras = ['Medifé', 'OMINT', 'Medicus']
+coberturas = ['smg', 'osde', 'prevencion', 'sancor', 'medife', 'obra social', 'otros']
+coberturas_otras = ['Medifé', 'OMINT', 'Medicus', 'Swiss Medical', 'Galeno']
 
-promociones = ['2x1', 'descuento_familiar', 'sin_carencia', 'otros']
-promociones_otras = ['50% primer mes', 'Sin copago 3 meses', 'Consultas gratis']
+promociones = [
+    'promocion sancor', 'promocion medicus', 'promocion omint', 
+    'promocion prevencion', 'promocion smg', 'promocion medife',
+    'osde', 'servicios insatisfactorios', 'no puede pagarlo', 'otros prepagos'
+]
 
-estados = ['abierto', 'cerrado']
-planes = ['210', '310', '410', '450', '510']
+estados = ['abierto', 'cerrado', 'no responde', 'vendido']
+
+planes = ['210', '310', '410', '450', '510', '610', '710']
+
+conyuges = ['sin conyuge', 'con conyuge']
 
 nombres = [
     "Juan Pérez", "María García", "Carlos López", "Ana Martínez",
@@ -35,7 +40,12 @@ observaciones = [
     "Consulta por medicación crónica",
     "Esperando respuesta del titular",
     "Necesita presupuesto detallado",
-    "Comparando planes y beneficios"
+    "Comparando planes y beneficios",
+    "Cliente muy interesado en promociones",
+    "Busca cobertura para toda la familia",
+    "Consulta por servicios específicos",
+    "Pendiente de evaluación médica",
+    "Interesado en beneficios adicionales"
 ]
 
 def generar_email(nombre):
@@ -58,7 +68,8 @@ def insertar_datos_ejemplo():
         usuarios_ejemplo = [
             "vendedor1@ejemplo.com",
             "vendedor2@ejemplo.com",
-            "vendedor3@ejemplo.com"
+            "vendedor3@ejemplo.com",
+            "vendedor4@ejemplo.com"
         ]
         
         usuarios_ids = []
@@ -76,25 +87,24 @@ def insertar_datos_ejemplo():
             usuarios_ids.append(usuario.id)
 
         # Insertar 50 contactos de ejemplo
-        for _ in range(50):
+        for i in range(50):
             nombre = random.choice(nombres)
             origen = random.choice(origenes)
-            origen_otro = random.choice(origenes_otros) if origen == 'otros' else None
             
             cobertura = random.choice(coberturas)
             cobertura_otra = random.choice(coberturas_otras) if cobertura == 'otros' else None
             
             promocion = random.choice(promociones)
-            promocion_otra = random.choice(promociones_otras) if promocion == 'otros' else None
+            
+            conyuge = random.choice(conyuges)
+            conyuge_edad = str(random.randint(25, 65)) if conyuge == 'con conyuge' else 'Sin cónyuge'
 
             contacto = Contacto(
                 usuario_id=random.choice(usuarios_ids),
                 origen=origen,
-                origen_otro=origen_otro,
                 cobertura_actual=cobertura,
                 cobertura_actual_otra=cobertura_otra,
                 promocion=promocion,
-                promocion_otra=promocion_otra,
                 privadoDesregulado=random.choice(['privado', 'desregulado']),
                 apellido_nombre=nombre,
                 correo_electronico=generar_email(nombre),
@@ -105,16 +115,35 @@ def insertar_datos_ejemplo():
                 fecha=generar_fecha_aleatoria(),
                 estado=random.choice(estados),
                 observaciones=random.choice(observaciones),
+                conyuge=conyuge,
+                conyuge_edad=conyuge_edad,
                 created_at=datetime.now() - timedelta(days=random.randint(0, 180))
             )
             db.session.add(contacto)
             
+            # Mostrar progreso cada 10 contactos
+            if (i + 1) % 10 == 0:
+                print(f"Procesados {i + 1} contactos...")
+            
         try:
             db.session.commit()
-            print("50 contactos de ejemplo insertados correctamente")
+            print("✅ 50 contactos de ejemplo insertados correctamente")
+            print(f"📊 Distribución por estado:")
+            
+            # Mostrar estadísticas
+            contactos_creados = Contacto.query.all()
+            estados_count = {}
+            for c in contactos_creados:
+                estados_count[c.estado] = estados_count.get(c.estado, 0) + 1
+            
+            for estado, count in estados_count.items():
+                print(f"   - {estado.capitalize()}: {count}")
+                
         except Exception as e:
-            print(f"Error al insertar datos: {str(e)}")
+            print(f"❌ Error al insertar datos: {str(e)}")
             db.session.rollback()
 
 if __name__ == "__main__":
-    insertar_datos_ejemplo() 
+    print("🚀 Iniciando inserción de datos de ejemplo...")
+    insertar_datos_ejemplo()
+    print("✨ Proceso completado") 

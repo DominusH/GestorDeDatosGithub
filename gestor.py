@@ -135,8 +135,17 @@ def admin():
 def exportar_contactos():
     if not current_user.is_admin:
         return redirect(url_for('auth.login'))
-        
+    
+    # Forzar recarga de datos desde la base de datos
+    db.session.expire_all()
     contactos = Contacto.query.all()
+    
+    # Log para verificar cuántos contactos se están exportando
+    logging.info(f"Exportando {len(contactos)} contactos para admin {current_user.email}")
+    
+    # Agregar timestamp al nombre del archivo para evitar caché
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"contactos_{timestamp}.xlsx"
     
     # Función para normalizar texto
     def normalize_text(text):
@@ -193,7 +202,7 @@ def exportar_contactos():
 
     for mes, grupo in grupos_mes:
         # Agregar encabezado del mes
-        ws_data.merge_cells(f'A{current_row}:P{current_row}')
+        ws_data.merge_cells(f'A{current_row}:Q{current_row}')
         mes_cell = ws_data[f'A{current_row}']
         mes_cell.value = f"CONTACTOS CARGADOS EN {mes.upper()}"
         mes_cell.fill = month_fill
@@ -206,7 +215,7 @@ def exportar_contactos():
             "Origen", "Cobertura Actual", "¿Por qué no toma la cobertura?", "Privado/Desregulado",
             "Apellido y nombre", "Correo electrónico", "Edad titular",
             "Teléfono", "Grupo familiar", "Plan ofrecido", "Fecha",
-            "Estado", "Observaciones", "Cónyuge", "Edad cónyuge", "Fecha de carga"
+            "Estado", "Observaciones", "Cónyuge", "Edad cónyuge", "Fecha de carga", "Usuario cargador"
         ]
 
         for col, header in enumerate(headers, 1):
@@ -235,6 +244,7 @@ def exportar_contactos():
             ws_data.cell(row=current_row, column=14).value = row['Cónyuge']
             ws_data.cell(row=current_row, column=15).value = row['Edad cónyuge']
             ws_data.cell(row=current_row, column=16).value = row['Fecha de carga']
+            ws_data.cell(row=current_row, column=17).value = row['Usuario cargador']
 
             # Aplicar estilo según el estado
             estado_cell = ws_data.cell(row=current_row, column=12)
@@ -416,10 +426,128 @@ def exportar_contactos():
         adjusted_width = (max_length + 2) * 1.2
         ws_stats.column_dimensions[column_letter].width = min(adjusted_width, 30)
 
-    # Guardar el archivo
-    wb.save("contactos.xlsx")
+    # Agregar hoja de ranking de usuarios
+    ws_ranking = wb.create_sheet(title="Ranking de Usuarios")
+    
+    # Título
+    ws_ranking.merge_cells('A1:E1')
+    ws_ranking['A1'] = "RANKING DE USUARIOS POR VENTAS"
+    ws_ranking['A1'].font = Font(size=16, bold=True, color="1F4E78")
+    ws_ranking['A1'].alignment = Alignment(horizontal="center")
+    
+    # Encabezados
+    headers = ["Posición", "Usuario", "Contactos Vendidos", "Total Contactos", "Tasa de Éxito"]
+    for col, header in enumerate(headers, 1):
+        cell = ws_ranking.cell(row=3, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+    
+    # Calcular ranking de usuarios
+    ranking_usuarios = df.groupby('Usuario cargador').agg({
+        'Apellido y nombre': 'count',  # Total de contactos
+        'Estado': lambda x: (x == 'vendido').sum()  # Contactos vendidos
+    }).rename(columns={
+        'Apellido y nombre': 'Total Contactos',
+        'Estado': 'Contactos Vendidos'
+    })
+    
+    # Calcular tasa de éxito
+    ranking_usuarios['Tasa de Éxito'] = (ranking_usuarios['Contactos Vendidos'] / ranking_usuarios['Total Contactos'] * 100).round(1)
+    
+    # Ordenar por contactos vendidos (de mayor a menor) - Los mejores vendedores primero
+    ranking_usuarios = ranking_usuarios.sort_values('Contactos Vendidos', ascending=False)
+    
+    # Agregar datos al Excel
+    current_row = 4
+    for posicion, (usuario, datos) in enumerate(ranking_usuarios.iterrows(), 1):
+        ws_ranking[f'A{current_row}'] = posicion
+        ws_ranking[f'B{current_row}'] = usuario
+        ws_ranking[f'C{current_row}'] = datos['Contactos Vendidos']
+        ws_ranking[f'D{current_row}'] = datos['Total Contactos']
+        ws_ranking[f'E{current_row}'] = f"{datos['Tasa de Éxito']:.1f}%"
+        
+        # Formato especial para el top 3
+        if posicion <= 3:
+            # Fondo dorado para el 1er lugar
+            if posicion == 1:
+                fill_color = "FFD700"  # Dorado
+                font_color = "000000"
+            # Fondo plateado para el 2do lugar
+            elif posicion == 2:
+                fill_color = "C0C0C0"  # Plateado
+                font_color = "000000"
+            # Fondo bronce para el 3er lugar
+            else:
+                fill_color = "CD7F32"  # Bronce
+                font_color = "FFFFFF"
+            
+            for col in range(1, 6):
+                cell = ws_ranking.cell(row=current_row, column=col)
+                cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+                cell.font = Font(bold=True, color=font_color)
+                cell.border = border
+                cell.alignment = Alignment(horizontal="center")
+        else:
+            # Formato normal para el resto
+            for col in range(1, 6):
+                cell = ws_ranking.cell(row=current_row, column=col)
+                cell.border = border
+                cell.alignment = Alignment(horizontal="center")
+        
+        current_row += 1
+    
+    # Agregar estadísticas adicionales
+    current_row += 2
+    ws_ranking.merge_cells(f'A{current_row}:E{current_row}')
+    stats_cell = ws_ranking[f'A{current_row}']
+    stats_cell.value = "ESTADÍSTICAS ADICIONALES"
+    stats_cell.font = Font(size=14, bold=True, color="1F4E78")
+    stats_cell.alignment = Alignment(horizontal="center")
+    current_row += 1
+    
+    # Total de usuarios activos
+    ws_ranking[f'A{current_row}'] = "Total de usuarios activos:"
+    ws_ranking[f'B{current_row}'] = len(ranking_usuarios)
+    current_row += 1
+    
+    # Promedio de contactos por usuario
+    promedio_contactos = ranking_usuarios['Total Contactos'].mean()
+    ws_ranking[f'A{current_row}'] = "Promedio de contactos por usuario:"
+    ws_ranking[f'B{current_row}'] = f"{promedio_contactos:.1f}"
+    current_row += 1
+    
+    # Usuario con más ventas
+    usuario_top = ranking_usuarios.index[0]
+    ventas_top = ranking_usuarios.iloc[0]['Contactos Vendidos']
+    ws_ranking[f'A{current_row}'] = "Usuario con más ventas:"
+    ws_ranking[f'B{current_row}'] = f"{usuario_top} ({ventas_top} ventas)"
+    current_row += 1
+    
+    # Usuario con mejor tasa de éxito
+    mejor_tasa = ranking_usuarios.loc[ranking_usuarios['Total Contactos'] >= 1, 'Tasa de Éxito'].idxmax()
+    tasa_mejor = ranking_usuarios.loc[mejor_tasa, 'Tasa de Éxito']
+    ws_ranking[f'A{current_row}'] = "Mejor tasa de éxito:"
+    ws_ranking[f'B{current_row}'] = f"{mejor_tasa} ({tasa_mejor:.1f}%)"
+    
+    # Ajustar ancho de columnas
+    for column in ws_ranking.columns:
+        max_length = 0
+        column_letter = get_column_letter(column[0].column)
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2) * 1.2
+        ws_ranking.column_dimensions[column_letter].width = min(adjusted_width, 30)
 
-    return send_file("contactos.xlsx", as_attachment=True)
+    # Guardar el archivo con nombre único
+    wb.save(filename)
+
+    return send_file(filename, as_attachment=True, download_name=filename)
 
 @gestor.route('/usuario', methods=["GET", "POST"])
 @login_required
@@ -571,7 +699,16 @@ def cambiar_estado_contacto():
 @gestor.route('/exportar_mis_contactos')
 @login_required
 def exportar_mis_contactos():
+    # Forzar recarga de datos desde la base de datos
+    db.session.expire_all()
     contactos = Contacto.query.filter_by(usuario_id=current_user.id).all()
+    
+    # Log para verificar cuántos contactos se están exportando
+    logging.info(f"Exportando {len(contactos)} contactos para usuario {current_user.email}")
+    
+    # Agregar timestamp al nombre del archivo para evitar caché
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"mis_contactos_{timestamp}.xlsx"
     
     # Función para normalizar texto
     def normalize_text(text):
@@ -712,10 +849,10 @@ def exportar_mis_contactos():
         adjusted_width = (max_length + 2) * 1.2
         ws_monthly.column_dimensions[column_letter].width = min(adjusted_width, 30)
 
-    # Guardar el archivo
-    wb.save("mis_contactos.xlsx")
+    # Guardar el archivo con nombre único
+    wb.save(filename)
     
-    return send_file("mis_contactos.xlsx", as_attachment=True)
+    return send_file(filename, as_attachment=True, download_name=filename)
 
 @gestor.route('/')
 def redirigirlogin():
