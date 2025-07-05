@@ -55,3 +55,6 @@ Thumbs.db
 
 # Archivos de migración (opcional, descomenta si no quieres versionar las migraciones)
 # migrations/versions/
+.venv/
+.xlsx
+instance/contactos.db
