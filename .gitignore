@@ -53,7 +53,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# Archivos de migración (opcional, descomenta si no quieres versionar las migraciones)
+# PODES descomentar si no queres versionar las migraciones)
 # migrations/versions/
 .venv/
 .xlsx
