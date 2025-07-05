@@ -71,7 +71,6 @@ class ContactoForm(FlaskForm):
     telefono = StringField('Teléfono', validators=[DataRequired()])
     grupo_familiar = StringField('Grupo familiar', validators=[DataRequired()])
     plan_ofrecido = StringField('Plan ofrecido', validators=[DataRequired()])
-    fecha = StringField('Fecha', validators=[DataRequired()])
     estado = SelectField('Estado',
         choices=[
             ('', 'Seleccione...'),

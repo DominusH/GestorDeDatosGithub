@@ -2,8 +2,17 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime
 from sqlalchemy.orm import relationship
+import pytz
 
 db = SQLAlchemy()
+
+def get_argentina_time():
+    """Obtiene la fecha y hora actual en la zona horaria de Chile + 1 hora (para coincidir con Buenos Aires)"""
+    chile_tz = pytz.timezone('America/Santiago')
+    chile_time = datetime.now(chile_tz)
+    # Sumar 1 hora para que coincida con Buenos Aires
+    from datetime import timedelta
+    return chile_time + timedelta(hours=1)
 
 class Usuario(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -16,7 +25,7 @@ class Usuario(db.Model, UserMixin):
     confirmation_token_expires = db.Column(db.DateTime)
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expires = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=get_argentina_time)
     contactos = relationship('Contacto', backref='usuario', lazy=True, cascade='all, delete-orphan')
 
     def get_id(self):
@@ -53,4 +62,4 @@ class Contacto(db.Model):
     observaciones = db.Column(db.Text)
     conyuge = db.Column(db.String(32), nullable=False)
     conyuge_edad = db.Column(db.String(32), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=get_argentina_time)

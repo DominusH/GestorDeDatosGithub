@@ -244,6 +244,21 @@
         select.is-invalid + .select-error {
             display: block;
         }
+
+        /* Estilos para el campo de promoción dinámico */
+        .promocion-select {
+            min-width: 150px;
+            font-size: 0.875rem;
+        }
+
+        .promocion-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+
+        .promocion-container {
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -307,32 +322,24 @@
                     <div class="select-group">
                         <h4><i class="fas fa-list-ul me-2"></i>Información de Origen y Cobertura</h4>
                         <div class="row">
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 {{ form.origen.label(class="form-label") }}
                                 {{ form.origen(class="form-select") }}
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 {{ form.cobertura_actual.label(class="form-label") }}
                                 {{ form.cobertura_actual(class="form-select") }}
                                 <div class="otros-field" id="cobertura_actual_otra_field">
                                     {{ form.cobertura_actual_otra(class="form-control", placeholder="Especifique la cobertura") }}
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                {{ form.promocion.label(class="form-label") }}
-                                {{ form.promocion(class="form-select") }}
-                            </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 {{ form.privadoDesregulado.label(class="form-label") }}
                                 {{ form.privadoDesregulado(class="form-select") }}
                             </div>
-                            <div class="col-md-4 mb-3">
-                                {{ form.estado.label(class="form-label") }}
-                                {{ form.estado(class="form-select") }}
-                            </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 {{ form.conyuge.label(class="form-label") }}
                                 {{ form.conyuge(class="form-select") }}
                                 <div class="otros-field" id="conyuge_edad_field">
@@ -381,8 +388,8 @@
                                 {{ form.plan_ofrecido(class="form-control") }}
                             </div>
                             <div class="col-md-6 mb-3">
-                                {{ form.fecha.label(class="form-label") }}
-                                {{ form.fecha(class="form-control") }}
+                                {{ form.estado.label(class="form-label") }}
+                                {{ form.estado(class="form-control") }}
                             </div>
                         </div>
 
@@ -425,10 +432,10 @@
                                 <th>Cobertura actual</th>
                                 <th>¿Por qué no toma la cobertura?</th>
                                 <th>Plan ofrecido</th>
-                                <th>Fecha</th>
                                 <th>Estado</th>
                                 <th>Cónyuge</th>
                                 <th>Edad cónyuge</th>
+                                <th>Fecha de carga</th>
                                 <th>Observaciones</th>
                             </tr>
                         </thead>
@@ -443,9 +450,28 @@
                                 <td>{{ c.telefono }}</td>
                                 <td>{{ c.grupo_familiar }}</td>
                                 <td>{{ c.cobertura_actual }}</td>
-                                <td>{{ c.promocion or 'No especificado' }}</td>
+                                <td>
+                                    <div class="promocion-container" data-contacto-id="{{ c.id }}">
+                                        {% if c.estado == 'cerrado' %}
+                                            <select class="form-select form-select-sm promocion-select" data-contacto-id="{{ c.id }}">
+                                                <option value="">Seleccione...</option>
+                                                <option value="promocion sancor" {% if c.promocion == 'promocion sancor' %}selected{% endif %}>Promocion Sancor</option>
+                                                <option value="promocion medicus" {% if c.promocion == 'promocion medicus' %}selected{% endif %}>Promocion Medicus</option>
+                                                <option value="promocion omint" {% if c.promocion == 'promocion omint' %}selected{% endif %}>Promocion Omint</option>
+                                                <option value="promocion prevencion" {% if c.promocion == 'promocion prevencion' %}selected{% endif %}>Promocion Prevencion</option>
+                                                <option value="promocion smg" {% if c.promocion == 'promocion smg' %}selected{% endif %}>Promocion SMG</option>
+                                                <option value="promocion medife" {% if c.promocion == 'promocion medife' %}selected{% endif %}>Promocion Medife</option>
+                                                <option value="osde" {% if c.promocion == 'osde' %}selected{% endif %}>Osde</option>
+                                                <option value="servicios insatisfactorios" {% if c.promocion == 'servicios insatisfactorios' %}selected{% endif %}>Servicios insatisfactorios</option>
+                                                <option value="no puede pagarlo" {% if c.promocion == 'no puede pagarlo' %}selected{% endif %}>No puede pagarlo</option>
+                                                <option value="otros prepagos" {% if c.promocion == 'otros prepagos' %}selected{% endif %}>Otros prepagos</option>
+                                            </select>
+                                        {% else %}
+                                            <span class="promocion-text">{{ c.promocion or 'No especificado' }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td>{{ c.plan_ofrecido }}</td>
-                                <td>{{ c.fecha }}</td>
                                 <td>
                                     <div class="dropdown">
                                         <button class="btn btn-sm dropdown-toggle estado-btn" 
@@ -468,6 +494,7 @@
                                 </td>
                                 <td>{{ c.conyuge }}</td>
                                 <td>{{ c.conyuge_edad }}</td>
+                                <td>{{ c.created_at.strftime('%d/%m/%Y') if c.created_at else 'N/A' }}</td>
                                 <td>{{ c.observaciones }}</td>
                             </tr>
                             {% endfor %}
@@ -528,10 +555,18 @@
             }
         }
 
-        // Configurar los manejadores para cada campo select
-        document.addEventListener('DOMContentLoaded', function() {
-            handleOtrosField('cobertura_actual', 'cobertura_actual_otra_field');
-            handleOtrosField('conyuge', 'conyuge_edad_field');
+                    // Configurar los manejadores para cada campo select
+            document.addEventListener('DOMContentLoaded', function() {
+                handleOtrosField('cobertura_actual', 'cobertura_actual_otra_field');
+                handleOtrosField('conyuge', 'conyuge_edad_field');
+
+                // Configurar event listeners para los selects de promoción existentes
+                document.querySelectorAll('.promocion-select').forEach(select => {
+                    select.addEventListener('change', function() {
+                        const contactoId = this.dataset.contactoId;
+                        actualizarPromocion(contactoId, this.value);
+                    });
+                });
 
             // Validar campos select al enviar el formulario
             document.querySelector('form').addEventListener('submit', function(e) {
@@ -644,6 +679,13 @@
                                     // Actualizar el dataset del botón
                                     btn.dataset.estadoActual = nuevoEstado;
                                     
+                                    // Manejar el campo de promoción si el estado cambió a "cerrado"
+                                    if (nuevoEstado === 'cerrado') {
+                                        mostrarCampoPromocion(contactoId);
+                                    } else {
+                                        ocultarCampoPromocion(contactoId);
+                                    }
+                                    
                                     console.log('Badge actualizado exitosamente - Texto:', badge.textContent, 'Clases:', badge.className);
                                     mostrarMensaje(data.message, 'success');
                                 } else {
@@ -669,6 +711,80 @@
                     }
                 }
             });
+
+            // Función para mostrar el campo de promoción
+            function mostrarCampoPromocion(contactoId) {
+                const container = document.querySelector(`.promocion-container[data-contacto-id="${contactoId}"]`);
+                if (container) {
+                    const promocionText = container.querySelector('.promocion-text');
+                    if (promocionText) {
+                        const valorActual = promocionText.textContent;
+                        const selectHTML = `
+                            <select class="form-select form-select-sm promocion-select" data-contacto-id="${contactoId}">
+                                <option value="">Seleccione...</option>
+                                <option value="promocion sancor" ${valorActual === 'Promocion Sancor' ? 'selected' : ''}>Promocion Sancor</option>
+                                <option value="promocion medicus" ${valorActual === 'Promocion Medicus' ? 'selected' : ''}>Promocion Medicus</option>
+                                <option value="promocion omint" ${valorActual === 'Promocion Omint' ? 'selected' : ''}>Promocion Omint</option>
+                                <option value="promocion prevencion" ${valorActual === 'Promocion Prevencion' ? 'selected' : ''}>Promocion Prevencion</option>
+                                <option value="promocion smg" ${valorActual === 'Promocion SMG' ? 'selected' : ''}>Promocion SMG</option>
+                                <option value="promocion medife" ${valorActual === 'Promocion Medife' ? 'selected' : ''}>Promocion Medife</option>
+                                <option value="osde" ${valorActual === 'Osde' ? 'selected' : ''}>Osde</option>
+                                <option value="servicios insatisfactorios" ${valorActual === 'Servicios insatisfactorios' ? 'selected' : ''}>Servicios insatisfactorios</option>
+                                <option value="no puede pagarlo" ${valorActual === 'No puede pagarlo' ? 'selected' : ''}>No puede pagarlo</option>
+                                <option value="otros prepagos" ${valorActual === 'Otros prepagos' ? 'selected' : ''}>Otros prepagos</option>
+                            </select>
+                        `;
+                        promocionText.outerHTML = selectHTML;
+                        
+                        // Agregar event listener al nuevo select
+                        const nuevoSelect = container.querySelector('.promocion-select');
+                        if (nuevoSelect) {
+                            nuevoSelect.addEventListener('change', function() {
+                                actualizarPromocion(contactoId, this.value);
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Función para ocultar el campo de promoción
+            function ocultarCampoPromocion(contactoId) {
+                const container = document.querySelector(`.promocion-container[data-contacto-id="${contactoId}"]`);
+                if (container) {
+                    const promocionSelect = container.querySelector('.promocion-select');
+                    if (promocionSelect) {
+                        const valorActual = promocionSelect.value;
+                        const textoHTML = `<span class="promocion-text">${valorActual || 'No especificado'}</span>`;
+                        promocionSelect.outerHTML = textoHTML;
+                    }
+                }
+            }
+
+            // Función para actualizar la promoción en el servidor
+            function actualizarPromocion(contactoId, nuevaPromocion) {
+                const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                
+                fetch('/actualizar_promocion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: `contacto_id=${contactoId}&nueva_promocion=${encodeURIComponent(nuevaPromocion)}&csrf_token=${csrfToken}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        mostrarMensaje('Motivo actualizado correctamente', 'success');
+                    } else {
+                        mostrarMensaje(data.message || 'Error al actualizar la promoción', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al actualizar promoción:', error);
+                    mostrarMensaje('Error al actualizar la promoción', 'danger');
+                });
+            }
 
             // Función para mostrar mensajes
             function mostrarMensaje(mensaje, tipo) {

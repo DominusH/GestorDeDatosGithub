@@ -256,10 +256,10 @@
                                 <th>Cobertura actual</th>
                                 <th>¿Por qué no toma la cobertura?</th>
                                 <th>Plan ofrecido</th>
-                                <th>Fecha</th>
                                 <th>Estado</th>
                                 <th>Cónyuge</th>
                                 <th>Edad cónyuge</th>
+                                <th>Fecha de carga</th>
                                 <th>Observaciones</th>
                             </tr>
                         </thead>
@@ -277,7 +277,6 @@
                                 <td>{{ c.cobertura_actual }}</td>
                                 <td>{{ c.promocion or 'No especificado' }}</td>
                                 <td>{{ c.plan_ofrecido }}</td>
-                                <td>{{ c.fecha }}</td>
                                 <td>
                                     <span class="badge {% if c.estado == 'abierto' %}badge-abierto{% else %}badge-cerrado{% endif %}">
                                         {{ c.estado }}
@@ -285,6 +284,7 @@
                                 </td>
                                 <td>{{ c.conyuge }}</td>
                                 <td>{{ c.conyuge_edad }}</td>
+                                <td>{{ c.created_at.strftime('%d/%m/%Y') if c.created_at else 'N/A' }}</td>
                                 <td>{{ c.observaciones }}</td>
                             </tr>
                             {% else %}

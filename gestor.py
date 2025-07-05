@@ -15,6 +15,7 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash
 import logging
 from datetime import timedelta, datetime
+import pytz
 from flask_wtf.csrf import CSRFProtect
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Side
@@ -165,7 +166,6 @@ def exportar_contactos():
         "Teléfono": c.telefono,
         "Grupo familiar": c.grupo_familiar,
         "Plan ofrecido": c.plan_ofrecido,
-        "Fecha": c.fecha,
         "Estado": c.estado,
         "Observaciones": c.observaciones,
         "Cónyuge": c.conyuge,
@@ -202,7 +202,7 @@ def exportar_contactos():
 
     for mes, grupo in grupos_mes:
         # Agregar encabezado del mes
-        ws_data.merge_cells(f'A{current_row}:Q{current_row}')
+        ws_data.merge_cells(f'A{current_row}:P{current_row}')
         mes_cell = ws_data[f'A{current_row}']
         mes_cell.value = f"CONTACTOS CARGADOS EN {mes.upper()}"
         mes_cell.fill = month_fill
@@ -214,7 +214,7 @@ def exportar_contactos():
         headers = [
             "Origen", "Cobertura Actual", "¿Por qué no toma la cobertura?", "Privado/Desregulado",
             "Apellido y nombre", "Correo electrónico", "Edad titular",
-            "Teléfono", "Grupo familiar", "Plan ofrecido", "Fecha",
+            "Teléfono", "Grupo familiar", "Plan ofrecido",
             "Estado", "Observaciones", "Cónyuge", "Edad cónyuge", "Fecha de carga", "Usuario cargador"
         ]
 
@@ -238,16 +238,15 @@ def exportar_contactos():
             ws_data.cell(row=current_row, column=8).value = row['Teléfono']
             ws_data.cell(row=current_row, column=9).value = row['Grupo familiar']
             ws_data.cell(row=current_row, column=10).value = row['Plan ofrecido']
-            ws_data.cell(row=current_row, column=11).value = row['Fecha']
-            ws_data.cell(row=current_row, column=12).value = row['Estado']
-            ws_data.cell(row=current_row, column=13).value = row['Observaciones']
-            ws_data.cell(row=current_row, column=14).value = row['Cónyuge']
-            ws_data.cell(row=current_row, column=15).value = row['Edad cónyuge']
-            ws_data.cell(row=current_row, column=16).value = row['Fecha de carga']
-            ws_data.cell(row=current_row, column=17).value = row['Usuario cargador']
+            ws_data.cell(row=current_row, column=11).value = row['Estado']
+            ws_data.cell(row=current_row, column=12).value = row['Observaciones']
+            ws_data.cell(row=current_row, column=13).value = row['Cónyuge']
+            ws_data.cell(row=current_row, column=14).value = row['Edad cónyuge']
+            ws_data.cell(row=current_row, column=15).value = row['Fecha de carga']
+            ws_data.cell(row=current_row, column=16).value = row['Usuario cargador']
 
             # Aplicar estilo según el estado
-            estado_cell = ws_data.cell(row=current_row, column=12)
+            estado_cell = ws_data.cell(row=current_row, column=11)
             if row['Estado'] == 'abierto':
                 estado_cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
                 estado_cell.font = Font(color="006100")
@@ -582,7 +581,6 @@ def usuario():
             ('telefono', 'Teléfono'),
             ('grupo_familiar', 'Grupo familiar'),
             ('plan_ofrecido', 'Plan ofrecido'),
-            ('fecha', 'Fecha'),
             ('estado', 'Estado')
         ]
         
@@ -618,7 +616,7 @@ def usuario():
                     telefono=form.telefono.data,
                     grupo_familiar=form.grupo_familiar.data,
                     plan_ofrecido=form.plan_ofrecido.data,
-                    fecha=form.fecha.data,
+                    fecha=datetime.now(pytz.timezone('America/Argentina/Mendoza')).strftime("%d/%m/%Y"),
                     estado=form.estado.data,
                     observaciones=form.observaciones.data,
                     conyuge=form.conyuge.data,
@@ -649,6 +647,60 @@ def usuario():
         flash("Error al cargar los contactos", "warning")
 
     return render_template('usuario.html', form=form, contactos_usuario=contactos_usuario)
+
+@gestor.route('/actualizar_promocion', methods=['POST'])
+@login_required
+def actualizar_promocion():
+    try:
+        logging.info(f"Recibiendo solicitud para actualizar promoción - Usuario: {current_user.id}")
+        contacto_id = request.form.get('contacto_id')
+        nueva_promocion = request.form.get('nueva_promocion')
+        
+        logging.info(f"Datos recibidos - contacto_id: {contacto_id}, nueva_promocion: {nueva_promocion}")
+        
+        if not contacto_id:
+            logging.warning("ID de contacto no proporcionado")
+            return jsonify({'success': False, 'message': 'ID de contacto requerido'})
+        
+        # Verificar que el contacto pertenece al usuario actual
+        contacto = Contacto.query.filter_by(id=contacto_id, usuario_id=current_user.id).first()
+        
+        if not contacto:
+            logging.warning(f"Contacto no encontrado - ID: {contacto_id}, Usuario: {current_user.id}")
+            return jsonify({'success': False, 'message': 'Contacto no encontrado'})
+        
+        # Verificar que el estado sea "cerrado"
+        if contacto.estado != 'cerrado':
+            logging.warning(f"Contacto no está en estado cerrado - Estado actual: {contacto.estado}")
+            return jsonify({'success': False, 'message': 'Solo se puede actualizar la promoción en contactos cerrados'})
+        
+        # Validar opciones de promoción
+        opciones_validas = [
+            'promocion sancor', 'promocion medicus', 'promocion omint', 'promocion prevencion',
+            'promocion smg', 'promocion medife', 'osde', 'servicios insatisfactorios',
+            'no puede pagarlo', 'otros prepagos', ''
+        ]
+        
+        if nueva_promocion not in opciones_validas:
+            logging.warning(f"Promoción no válida: {nueva_promocion}")
+            return jsonify({'success': False, 'message': 'Opción de promoción no válida'})
+        
+        # Actualizar la promoción
+        contacto.promocion = nueva_promocion if nueva_promocion else None
+        db.session.commit()
+        
+        logging.info(f"Promoción actualizada exitosamente - Nueva promoción: {nueva_promocion}")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Promoción actualizada correctamente',
+            'nueva_promocion': nueva_promocion
+        })
+        
+    except Exception as e:
+        logging.error(f"Error al actualizar promoción del contacto: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Error al actualizar la promoción'})
 
 @gestor.route('/cambiar_estado_contacto', methods=['POST'])
 @login_required
@@ -727,7 +779,6 @@ def exportar_mis_contactos():
         "Teléfono": c.telefono,
         "Grupo familiar": c.grupo_familiar,
         "Plan ofrecido": c.plan_ofrecido,
-        "Fecha": c.fecha,
         "Estado": c.estado,
         "Observaciones": c.observaciones,
         "Cónyuge": c.conyuge,
