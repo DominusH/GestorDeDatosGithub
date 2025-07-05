@@ -19,6 +19,7 @@ import pytz
 from flask_wtf.csrf import CSRFProtect
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Side
+import glob
 
 # Configurar logging primero
 logging.basicConfig(
@@ -123,6 +124,36 @@ with gestor.app_context():
 # Configurar manejo de usuarios anónimos
 login_manager.anonymous_user = Anonymous
 
+def limpiar_archivos_temporales():
+    """Eliminar archivos Excel temporales antiguos (más de 1 hora)"""
+    try:
+        import os
+        import time
+        
+        # Limpiar archivos .xlsx en el directorio raíz
+        for archivo in glob.glob("*.xlsx"):
+            if os.path.exists(archivo):
+                tiempo_modificacion = os.path.getmtime(archivo)
+                tiempo_actual = time.time()
+                # Eliminar archivos más antiguos de 1 hora
+                if tiempo_actual - tiempo_modificacion > 3600:
+                    os.remove(archivo)
+                    logging.info(f"Archivo temporal eliminado: {archivo}")
+        
+        # Limpiar archivos en el directorio temp
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+        if os.path.exists(temp_dir):
+            for archivo in glob.glob(os.path.join(temp_dir, "*.xlsx")):
+                if os.path.exists(archivo):
+                    tiempo_modificacion = os.path.getmtime(archivo)
+                    tiempo_actual = time.time()
+                    # Eliminar archivos más antiguos de 1 hora
+                    if tiempo_actual - tiempo_modificacion > 3600:
+                        os.remove(archivo)
+                        logging.info(f"Archivo temporal eliminado: {archivo}")
+    except Exception as e:
+        logging.error(f"Error al limpiar archivos temporales: {str(e)}")
+
 @gestor.route('/admin')
 @login_required
 def admin():
@@ -136,6 +167,9 @@ def admin():
 def exportar_contactos():
     if not current_user.is_admin:
         return redirect(url_for('auth.login'))
+    
+    # Limpiar archivos temporales antes de generar nuevo archivo
+    limpiar_archivos_temporales()
     
     # Forzar recarga de datos desde la base de datos
     db.session.expire_all()
@@ -497,38 +531,6 @@ def exportar_contactos():
         
         current_row += 1
     
-    # Agregar estadísticas adicionales
-    current_row += 2
-    ws_ranking.merge_cells(f'A{current_row}:E{current_row}')
-    stats_cell = ws_ranking[f'A{current_row}']
-    stats_cell.value = "ESTADÍSTICAS ADICIONALES"
-    stats_cell.font = Font(size=14, bold=True, color="1F4E78")
-    stats_cell.alignment = Alignment(horizontal="center")
-    current_row += 1
-    
-    # Total de usuarios activos
-    ws_ranking[f'A{current_row}'] = "Total de usuarios activos:"
-    ws_ranking[f'B{current_row}'] = len(ranking_usuarios)
-    current_row += 1
-    
-    # Promedio de contactos por usuario
-    promedio_contactos = ranking_usuarios['Total Contactos'].mean()
-    ws_ranking[f'A{current_row}'] = "Promedio de contactos por usuario:"
-    ws_ranking[f'B{current_row}'] = f"{promedio_contactos:.1f}"
-    current_row += 1
-    
-    # Usuario con más ventas
-    usuario_top = ranking_usuarios.index[0]
-    ventas_top = ranking_usuarios.iloc[0]['Contactos Vendidos']
-    ws_ranking[f'A{current_row}'] = "Usuario con más ventas:"
-    ws_ranking[f'B{current_row}'] = f"{usuario_top} ({ventas_top} ventas)"
-    current_row += 1
-    
-    # Usuario con mejor tasa de éxito
-    mejor_tasa = ranking_usuarios.loc[ranking_usuarios['Total Contactos'] >= 1, 'Tasa de Éxito'].idxmax()
-    tasa_mejor = ranking_usuarios.loc[mejor_tasa, 'Tasa de Éxito']
-    ws_ranking[f'A{current_row}'] = "Mejor tasa de éxito:"
-    ws_ranking[f'B{current_row}'] = f"{mejor_tasa} ({tasa_mejor:.1f}%)"
     
     # Ajustar ancho de columnas
     for column in ws_ranking.columns:
@@ -543,10 +545,34 @@ def exportar_contactos():
         adjusted_width = (max_length + 2) * 1.2
         ws_ranking.column_dimensions[column_letter].width = min(adjusted_width, 30)
 
-    # Guardar el archivo con nombre único
-    wb.save(filename)
-
-    return send_file(filename, as_attachment=True, download_name=filename)
+    # Guardar el archivo en un directorio temporal
+    import tempfile
+    import os
+    
+    # Crear directorio temporal si no existe
+    temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    
+    file_path = os.path.join(temp_dir, filename)
+    wb.save(file_path)
+    
+    try:
+        return send_file(
+            file_path, 
+            as_attachment=True, 
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        logging.error(f"Error al enviar archivo: {str(e)}")
+        # Fallback: intentar enviar desde el directorio actual
+        try:
+            wb.save(filename)
+            return send_file(filename, as_attachment=True, download_name=filename)
+        except Exception as e2:
+            logging.error(f"Error en fallback: {str(e2)}")
+            return jsonify({'error': 'Error al generar el archivo Excel'}), 500
 
 @gestor.route('/usuario', methods=["GET", "POST"])
 @login_required
@@ -748,162 +774,204 @@ def cambiar_estado_contacto():
         db.session.rollback()
         return jsonify({'success': False, 'message': 'Error al actualizar el estado'})
 
+@gestor.route('/exportar_mis_contactos_simple')
+@login_required
+def exportar_mis_contactos_simple():
+    """Versión simplificada de exportación para PythonAnywhere"""
+    try:
+        logging.info(f"Exportación simple para usuario {current_user.email}")
+        
+        # Obtener contactos
+        contactos = Contacto.query.filter_by(usuario_id=current_user.id).all()
+        
+        # Crear archivo CSV simple como fallback
+        import csv
+        import io
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Encabezados
+        headers = [
+            "Origen", "Cobertura Actual", "¿Por qué no toma la cobertura?", 
+            "Privado/Desregulado", "Apellido y nombre", "Correo electrónico",
+            "Edad titular", "Teléfono", "Grupo familiar", "Plan ofrecido",
+            "Estado", "Observaciones", "Cónyuge", "Edad cónyuge", "Fecha de carga"
+        ]
+        writer.writerow(headers)
+        
+        # Datos
+        for c in contactos:
+            row = [
+                c.origen or "",
+                c.cobertura_actual_otra if c.cobertura_actual == 'otros' else (c.cobertura_actual or ""),
+                c.promocion or "No especificado",
+                c.privadoDesregulado or "",
+                c.apellido_nombre or "",
+                c.correo_electronico or "",
+                c.edad_titular or "",
+                c.telefono or "",
+                c.grupo_familiar or "",
+                c.plan_ofrecido or "",
+                c.estado or "",
+                c.observaciones or "",
+                c.conyuge or "",
+                c.conyuge_edad or "",
+                c.created_at.strftime("%d/%m/%Y") if c.created_at else "N/A"
+            ]
+            writer.writerow(row)
+        
+        output.seek(0)
+        
+        # Crear respuesta
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"mis_contactos_{timestamp}.csv"
+        
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+        
+        logging.info("Exportación CSV completada exitosamente")
+        return response
+        
+    except Exception as e:
+        logging.error(f"Error en exportación simple: {str(e)}")
+        return jsonify({'error': 'Error en exportación simple'}), 500
+
 @gestor.route('/exportar_mis_contactos')
 @login_required
 def exportar_mis_contactos():
-    # Forzar recarga de datos desde la base de datos
-    db.session.expire_all()
-    contactos = Contacto.query.filter_by(usuario_id=current_user.id).all()
-    
-    # Log para verificar cuántos contactos se están exportando
-    logging.info(f"Exportando {len(contactos)} contactos para usuario {current_user.email}")
-    
-    # Agregar timestamp al nombre del archivo para evitar caché
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"mis_contactos_{timestamp}.xlsx"
-    
-    # Función para normalizar texto
-    def normalize_text(text):
-        if text:
-            return text.strip().lower().capitalize()
-        return text
-    
-    data = [{
-        "Origen": normalize_text(c.origen),
-        "Cobertura Actual": normalize_text(c.cobertura_actual_otra) if c.cobertura_actual == 'otros' else c.cobertura_actual,
-        "¿Por qué no toma la cobertura?": normalize_text(c.promocion) if c.promocion else "No especificado",
-        "Privado/Desregulado": c.privadoDesregulado,
-        "Apellido y nombre": c.apellido_nombre,
-        "Correo electrónico": c.correo_electronico,
-        "Edad titular": c.edad_titular,
-        "Teléfono": c.telefono,
-        "Grupo familiar": c.grupo_familiar,
-        "Plan ofrecido": c.plan_ofrecido,
-        "Estado": c.estado,
-        "Observaciones": c.observaciones,
-        "Cónyuge": c.conyuge,
-        "Edad cónyuge": c.conyuge_edad,
-        "Fecha de carga": c.created_at.strftime("%d/%m/%Y")
-    } for c in contactos]
-    
-    df = pd.DataFrame(data)
-    
-    # Crear un nuevo libro de Excel
-    wb = openpyxl.Workbook()
-    
-    # Configurar estilos generales
-    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True, size=11)
-    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    
-    # Crear la hoja de datos
-    ws_data = wb.active
-    ws_data.title = "Mis Contactos"
-    
-    # Convertir DataFrame a Excel
-    for r in dataframe_to_rows(df, index=False, header=True):
-        ws_data.append(r)
-    
-    # Formato de encabezados
-    for cell in ws_data[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_alignment
-    
-    # Ajustar ancho de columnas
-    for column in ws_data.columns:
-        max_length = 0
-        column_letter = get_column_letter(column[0].column)
-        for cell in column:
+    try:
+        logging.info(f"Iniciando exportación para usuario {current_user.email}")
+        
+        # Forzar recarga de datos desde la base de datos
+        db.session.expire_all()
+        contactos = Contacto.query.filter_by(usuario_id=current_user.id).all()
+        
+        # Log para verificar cuántos contactos se están exportando
+        logging.info(f"Exportando {len(contactos)} contactos para usuario {current_user.email}")
+        
+        # Agregar timestamp al nombre del archivo para evitar caché
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"mis_contactos_{timestamp}.xlsx"
+        
+        # Función para normalizar texto
+        def normalize_text(text):
+            if text:
+                return text.strip().lower().capitalize()
+            return text
+        
+        # Crear datos de forma más simple
+        data = []
+        for c in contactos:
             try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2) * 1.2
-        ws_data.column_dimensions[column_letter].width = min(adjusted_width, 30)
-
-    # Agregar bordes a todas las celdas con datos
-    border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
-    for row in ws_data.iter_rows(min_row=1, max_row=ws_data.max_row):
-        for cell in row:
-            if cell.value is not None:
-                cell.border = border
-                if not cell.alignment:
-                    cell.alignment = Alignment(horizontal="left", vertical="center")
-
-    # Agregar hoja de resumen mensual
-    ws_monthly = wb.create_sheet(title="Resumen Mensual")
-    
-    # Título
-    ws_monthly.merge_cells('A1:F1')
-    ws_monthly['A1'] = "RESUMEN DE CONTACTOS POR MES"
-    ws_monthly['A1'].font = Font(size=16, bold=True, color="1F4E78")
-    ws_monthly['A1'].alignment = Alignment(horizontal="center")
-    
-    # Encabezados
-    headers = ["Mes", "Total Contactos", "Planes Vendidos", "Abiertos", "Cerrados", "Tasa de Efectividad"]
-    for col, header in enumerate(headers, 1):
-        cell = ws_monthly.cell(row=3, column=col)
-        cell.value = header
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_alignment
-    
-    # Ordenar los datos por fecha de carga
-    df['Mes de carga'] = pd.to_datetime(df['Fecha de carga'], format='%d/%m/%Y').dt.strftime('%B %Y')
-    df = df.sort_values('Fecha de carga')
-    
-    # Agrupar por mes
-    grupos_mes = df.groupby('Mes de carga')
-    
-    # Datos por mes
-    current_row = 4
-    for mes, grupo in grupos_mes:
-        total = len(grupo)
-        vendidos = len(grupo[grupo['Estado'] == 'vendido'])
-        abiertos = len(grupo[grupo['Estado'] == 'abierto'])
-        cerrados = len(grupo[grupo['Estado'] == 'cerrado'])
-        tasa = (vendidos / total * 100) if total > 0 else 0
+                data.append({
+                    "Origen": normalize_text(c.origen),
+                    "Cobertura Actual": normalize_text(c.cobertura_actual_otra) if c.cobertura_actual == 'otros' else c.cobertura_actual,
+                    "¿Por qué no toma la cobertura?": normalize_text(c.promocion) if c.promocion else "No especificado",
+                    "Privado/Desregulado": c.privadoDesregulado,
+                    "Apellido y nombre": c.apellido_nombre,
+                    "Correo electrónico": c.correo_electronico,
+                    "Edad titular": c.edad_titular,
+                    "Teléfono": c.telefono,
+                    "Grupo familiar": c.grupo_familiar,
+                    "Plan ofrecido": c.plan_ofrecido,
+                    "Estado": c.estado,
+                    "Observaciones": c.observaciones,
+                    "Cónyuge": c.conyuge,
+                    "Edad cónyuge": c.conyuge_edad,
+                    "Fecha de carga": c.created_at.strftime("%d/%m/%Y") if c.created_at else "N/A"
+                })
+            except Exception as e:
+                logging.error(f"Error procesando contacto {c.id}: {str(e)}")
+                continue
         
-        ws_monthly[f'A{current_row}'] = mes
-        ws_monthly[f'B{current_row}'] = total
-        ws_monthly[f'C{current_row}'] = vendidos
-        ws_monthly[f'D{current_row}'] = abiertos
-        ws_monthly[f'E{current_row}'] = cerrados
-        ws_monthly[f'F{current_row}'] = f"{tasa:.1f}%"
+        logging.info(f"Datos procesados: {len(data)} registros")
         
-        # Formato
-        for col in range(1, 7):
-            cell = ws_monthly.cell(row=current_row, column=col)
-            cell.border = border
-            cell.alignment = Alignment(horizontal="center")
+        # Crear DataFrame de forma más segura
+        try:
+            df = pd.DataFrame(data)
+            logging.info("DataFrame creado exitosamente")
+        except Exception as e:
+            logging.error(f"Error creando DataFrame: {str(e)}")
+            return jsonify({'error': 'Error al procesar los datos'}), 500
         
-        current_row += 1
-    
-    # Ajustar ancho de columnas
-    for column in ws_monthly.columns:
-        max_length = 0
-        column_letter = get_column_letter(column[0].column)
-        for cell in column:
+        # Crear un nuevo libro de Excel
+        try:
+            wb = openpyxl.Workbook()
+            logging.info("Libro Excel creado")
+        except Exception as e:
+            logging.error(f"Error creando libro Excel: {str(e)}")
+            return jsonify({'error': 'Error al crear el archivo Excel'}), 500
+        
+        # Configurar estilos básicos
+        try:
+            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True, size=11)
+            header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            logging.info("Estilos configurados")
+        except Exception as e:
+            logging.error(f"Error configurando estilos: {str(e)}")
+            # Continuar sin estilos si hay error
+        
+        # Crear la hoja de datos
+        try:
+            ws_data = wb.active
+            ws_data.title = "Mis Contactos"
+            
+            # Agregar encabezados
+            headers = list(df.columns)
+            for col, header in enumerate(headers, 1):
+                cell = ws_data.cell(row=1, column=col)
+                cell.value = header
+                try:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = header_alignment
+                except:
+                    pass  # Continuar sin estilos si hay error
+            
+            # Agregar datos
+            for row_idx, row_data in enumerate(df.values, 2):
+                for col_idx, value in enumerate(row_data, 1):
+                    cell = ws_data.cell(row=row_idx, column=col_idx)
+                    cell.value = str(value) if value is not None else ""
+            
+            logging.info("Datos agregados a Excel")
+            
+        except Exception as e:
+            logging.error(f"Error agregando datos a Excel: {str(e)}")
+            return jsonify({'error': 'Error al agregar datos al Excel'}), 500
+        
+        # Intentar guardar el archivo
+        try:
+            # Intentar guardar en el directorio actual primero
+            wb.save(filename)
+            logging.info(f"Archivo guardado como: {filename}")
+            
+            # Intentar enviar el archivo
             try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2) * 1.2
-        ws_monthly.column_dimensions[column_letter].width = min(adjusted_width, 30)
-
-    # Guardar el archivo con nombre único
-    wb.save(filename)
-    
-    return send_file(filename, as_attachment=True, download_name=filename)
+                response = send_file(
+                    filename, 
+                    as_attachment=True, 
+                    download_name=filename,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                logging.info("Archivo enviado exitosamente")
+                return response
+            except Exception as e:
+                logging.error(f"Error enviando archivo: {str(e)}")
+                return jsonify({'error': 'Error al enviar el archivo'}), 500
+                
+        except Exception as e:
+            logging.error(f"Error guardando archivo: {str(e)}")
+            return jsonify({'error': 'Error al guardar el archivo Excel'}), 500
+            
+    except Exception as e:
+        logging.error(f"Error general en exportación: {str(e)}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
 @gestor.route('/')
 def redirigirlogin():
@@ -975,8 +1043,8 @@ def sitemap_xml():
 @gestor.before_request
 def add_security_headers():
     """Agregar headers para evitar indexación y mejorar seguridad"""
-    # Solo agregar headers si no es una solicitud de archivos estáticos
-    if not request.path.startswith('/static/'):
+    # Solo agregar headers si no es una solicitud de archivos estáticos o descargas
+    if not request.path.startswith('/static/') and not request.path.startswith('/exportar'):
         response = make_response()
         response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive, nosnippet, noimageindex'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -986,6 +1054,19 @@ def add_security_headers():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+
+# Middleware para manejar descargas en PythonAnywhere
+@gestor.after_request
+def add_download_headers(response):
+    """Agregar headers específicos para descargas de archivos"""
+    if request.path.startswith('/exportar'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        # Asegurar que el archivo se descargue correctamente
+        if 'Content-Disposition' in response.headers:
+            response.headers['Content-Disposition'] = response.headers['Content-Disposition'].replace('attachment; ', 'attachment; filename*=UTF-8\'\'')
+    return response
 
 if __name__ == '__main__':
     # Solo ejecutar en desarrollo local, no en PythonAnywhere
