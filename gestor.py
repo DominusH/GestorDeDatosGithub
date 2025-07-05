@@ -553,17 +553,19 @@ def exportar_contactos():
     file_path = os.path.join(temp_dir, filename)
     wb.save(file_path)
 
-    logging.info(f"¿Existe el archivo? {os.path.exists(file_path)} - {file_path}")
+    logging.info(f"Archivo guardado como: {file_path}")
 
     try:
-        return send_file(
+        response = send_file(
             file_path,
             as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+        logging.info("Archivo enviado exitosamente")
+        return response
     except Exception as e:
-        logging.error(f"Error al enviar archivo: {str(e)}")
+        logging.error(f"Error enviando archivo: {str(e)}")
         return jsonify({'error': 'Error al enviar el archivo'}), 500
 
 @gestor.route('/usuario', methods=["GET", "POST"])
@@ -937,25 +939,28 @@ def exportar_mis_contactos():
             logging.error(f"Error agregando datos a Excel: {str(e)}")
             return jsonify({'error': 'Error al agregar datos al Excel'}), 500
         
-        # Intentar guardar el archivo
+        # Guardar el archivo en un directorio temporal
+        import os
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        file_path = os.path.join(temp_dir, filename)
+        wb.save(file_path)
+
+        logging.info(f"Archivo guardado como: {file_path}")
+
         try:
-            wb.save(file_path)
-            logging.info(f"Archivo guardado como: {file_path}")
-            try:
-                response = send_file(
-                    file_path,
-                    as_attachment=True,
-                    download_name=filename,
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )
-                logging.info("Archivo enviado exitosamente")
-                return response
-            except Exception as e:
-                logging.error(f"Error enviando archivo: {str(e)}")
-                return jsonify({'error': 'Error al enviar el archivo'}), 500
+            response = send_file(
+                file_path,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            logging.info("Archivo enviado exitosamente")
+            return response
         except Exception as e:
-            logging.error(f"Error guardando archivo: {str(e)}")
-            return jsonify({'error': 'Error al guardar el archivo Excel'}), 500
+            logging.error(f"Error enviando archivo: {str(e)}")
+            return jsonify({'error': 'Error al enviar el archivo'}), 500
             
     except Exception as e:
         logging.error(f"Error general en exportación: {str(e)}")

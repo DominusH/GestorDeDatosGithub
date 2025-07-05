@@ -389,7 +389,14 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 {{ form.estado.label(class="form-label") }}
-                                {{ form.estado(class="form-control") }}
+                                {{ form.estado(class="form-control", id="estado") }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3" id="promocion_field" style="display: none;">
+                                {{ form.promocion.label(class="form-label") }}
+                                {{ form.promocion(class="form-select") }}
                             </div>
                         </div>
 
@@ -573,6 +580,30 @@
                         actualizarPromocion(contactoId, this.value);
                     });
                 });
+
+                // Manejar la visibilidad del campo de promoción en el formulario
+                const estadoSelect = document.getElementById('estado');
+                const promocionField = document.getElementById('promocion_field');
+                
+                if (estadoSelect && promocionField) {
+                    estadoSelect.addEventListener('change', function() {
+                        if (this.value === 'cerrado') {
+                            promocionField.style.display = 'block';
+                        } else {
+                            promocionField.style.display = 'none';
+                            // Limpiar el valor del campo de promoción cuando se oculta
+                            const promocionSelect = promocionField.querySelector('select');
+                            if (promocionSelect) {
+                                promocionSelect.value = '';
+                            }
+                        }
+                    });
+                    
+                    // Inicializar estado al cargar la página
+                    if (estadoSelect.value === 'cerrado') {
+                        promocionField.style.display = 'block';
+                    }
+                }
 
             // Validar campos select al enviar el formulario
             document.querySelector('form').addEventListener('submit', function(e) {
