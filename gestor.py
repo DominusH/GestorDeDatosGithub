@@ -939,15 +939,12 @@ def exportar_mis_contactos():
         
         # Intentar guardar el archivo
         try:
-            # Intentar guardar en el directorio actual primero
-            wb.save(filename)
-            logging.info(f"Archivo guardado como: {filename}")
-            
-            # Intentar enviar el archivo
+            wb.save(file_path)
+            logging.info(f"Archivo guardado como: {file_path}")
             try:
                 response = send_file(
-                    filename, 
-                    as_attachment=True, 
+                    file_path,
+                    as_attachment=True,
                     download_name=filename,
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
@@ -956,7 +953,6 @@ def exportar_mis_contactos():
             except Exception as e:
                 logging.error(f"Error enviando archivo: {str(e)}")
                 return jsonify({'error': 'Error al enviar el archivo'}), 500
-                
         except Exception as e:
             logging.error(f"Error guardando archivo: {str(e)}")
             return jsonify({'error': 'Error al guardar el archivo Excel'}), 500
