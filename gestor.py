@@ -546,33 +546,25 @@ def exportar_contactos():
         ws_ranking.column_dimensions[column_letter].width = min(adjusted_width, 30)
 
     # Guardar el archivo en un directorio temporal
-    import tempfile
     import os
-    
-    # Crear directorio temporal si no existe
     temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
-    
     file_path = os.path.join(temp_dir, filename)
     wb.save(file_path)
-    
+
+    logging.info(f"¿Existe el archivo? {os.path.exists(file_path)} - {file_path}")
+
     try:
         return send_file(
-            file_path, 
-            as_attachment=True, 
+            file_path,
+            as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
         logging.error(f"Error al enviar archivo: {str(e)}")
-        # Fallback: intentar enviar desde el directorio actual
-        try:
-            wb.save(filename)
-            return send_file(filename, as_attachment=True, download_name=filename)
-        except Exception as e2:
-            logging.error(f"Error en fallback: {str(e2)}")
-            return jsonify({'error': 'Error al generar el archivo Excel'}), 500
+        return jsonify({'error': 'Error al enviar el archivo'}), 500
 
 @gestor.route('/usuario', methods=["GET", "POST"])
 @login_required
