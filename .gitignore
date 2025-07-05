@@ -4,4 +4,4 @@ __pycache__/
 .vscode/
 .venv/
 .xlsx
-.db
+instance/contactos.db
