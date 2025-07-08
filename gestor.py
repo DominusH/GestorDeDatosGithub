@@ -1061,6 +1061,62 @@ def add_download_headers(response):
             response.headers['Content-Disposition'] = response.headers['Content-Disposition'].replace('attachment; ', 'attachment; filename*=UTF-8\'\'')
     return response
 
+@gestor.route('/buscar_contactos_por_email', methods=['POST'])
+@login_required
+def buscar_contactos_por_email():
+    try:
+        email = request.form.get('email', '').strip()
+        
+        if not email:
+            return jsonify({'success': False, 'message': 'Por favor ingrese un email para buscar'})
+        
+        # Buscar contactos que contengan el email (búsqueda parcial)
+        if current_user.is_admin:
+            # Para admin, buscar en todos los contactos
+            contactos = Contacto.query.filter(
+                Contacto.correo_electronico.ilike(f'%{email}%')
+            ).all()
+        else:
+            # Para usuarios normales, buscar solo en sus contactos
+            contactos = Contacto.query.filter(
+                Contacto.correo_electronico.ilike(f'%{email}%'),
+                Contacto.usuario_id == current_user.id
+            ).all()
+        
+        # Preparar datos para la respuesta
+        datos_contactos = []
+        for c in contactos:
+            datos_contactos.append({
+                'id': c.id,
+                'origen': c.origen,
+                'privadoDesregulado': c.privadoDesregulado,
+                'apellido_nombre': c.apellido_nombre,
+                'correo_electronico': c.correo_electronico,
+                'edad_titular': c.edad_titular,
+                'telefono': c.telefono,
+                'grupo_familiar': c.grupo_familiar,
+                'cobertura_actual': c.cobertura_actual,
+                'promocion': c.promocion or 'No especificado',
+                'plan_ofrecido': c.plan_ofrecido,
+                'estado': c.estado,
+                'conyuge': c.conyuge,
+                'conyuge_edad': c.conyuge_edad,
+                'fecha_carga': c.created_at.strftime('%d/%m/%Y') if c.created_at else 'N/A',
+                'observaciones': c.observaciones,
+                'usuario_email': c.usuario.email if current_user.is_admin else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'contactos': datos_contactos,
+            'total': len(datos_contactos),
+            'message': f'Se encontraron {len(datos_contactos)} contacto(s) con el email "{email}"'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error al buscar contactos por email: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error al realizar la búsqueda'})
+
 if __name__ == '__main__':
     # Solo ejecutar en desarrollo local, no en PythonAnywhere
     import socket

@@ -431,6 +431,28 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Buscador -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="email" class="form-control" id="buscarEmail" placeholder="Buscar por email...">
+                            <button class="btn btn-primary" type="button" id="btnBuscar">
+                                <i class="fas fa-search me-2"></i>
+                                Buscar
+                            </button>
+                            <button class="btn btn-secondary" type="button" id="btnLimpiar" style="display: none;">
+                                <i class="fas fa-times me-2"></i>
+                                Limpiar
+                            </button>
+                        </div>
+                        <!-- Campo CSRF oculto para el buscador -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    </div>
+                    <div class="col-md-6">
+                        <div id="resultadoBusqueda" class="alert" style="display: none;"></div>
+                    </div>
+                </div>
+            <div class="card-body">
                 <div class="table-wrapper">
                     <table class="table table-hover align-middle">
                         <thead>
@@ -884,6 +906,148 @@
                     console.error('Error al mostrar mensaje:', error);
                     // Fallback simple
                     alert(mensaje);
+                }
+            }
+
+            // Funcionalidad de búsqueda por email
+            const buscarEmail = document.getElementById('buscarEmail');
+            const btnBuscar = document.getElementById('btnBuscar');
+            const btnLimpiar = document.getElementById('btnLimpiar');
+            const resultadoBusqueda = document.getElementById('resultadoBusqueda');
+            const tablaContactos = document.querySelector('.table-wrapper table tbody');
+            const tablaOriginal = tablaContactos.innerHTML;
+
+            // Verificar que los elementos existen
+            console.log('Elementos del buscador:', {
+                buscarEmail: buscarEmail,
+                btnBuscar: btnBuscar,
+                btnLimpiar: btnLimpiar,
+                resultadoBusqueda: resultadoBusqueda,
+                tablaContactos: tablaContactos
+            });
+
+            // Buscar al presionar Enter
+            buscarEmail.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    buscarContactos();
+                }
+            });
+
+            // Buscar al hacer clic en el botón
+            btnBuscar.addEventListener('click', buscarContactos);
+
+            // Limpiar búsqueda
+            btnLimpiar.addEventListener('click', function() {
+                buscarEmail.value = '';
+                resultadoBusqueda.style.display = 'none';
+                tablaContactos.innerHTML = tablaOriginal;
+                btnLimpiar.style.display = 'none';
+                btnBuscar.style.display = 'inline-block';
+            });
+
+            function buscarContactos() {
+                console.log('Función buscarContactos ejecutada');
+                const email = buscarEmail.value.trim();
+                console.log('Email a buscar:', email);
+                
+                if (!email) {
+                    mostrarMensaje('Por favor ingrese un email para buscar', 'warning');
+                    return;
+                }
+
+                // Mostrar indicador de carga
+                btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Buscando...';
+                btnBuscar.disabled = true;
+
+                // Obtener el token CSRF del campo oculto del buscador
+                const csrfToken = btnBuscar.closest('.col-md-6').querySelector('input[name="csrf_token"]').value;
+
+                fetch('/buscar_contactos_por_email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: `email=${encodeURIComponent(email)}&csrf_token=${csrfToken}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        mostrarResultadosBusqueda(data.contactos, data.message);
+                    } else {
+                        mostrarMensaje(data.message, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error en búsqueda:', error);
+                    mostrarMensaje('Error al realizar la búsqueda', 'danger');
+                })
+                .finally(() => {
+                    // Restaurar botón
+                    btnBuscar.innerHTML = '<i class="fas fa-search me-2"></i>Buscar';
+                    btnBuscar.disabled = false;
+                });
+            }
+
+            function mostrarResultadosBusqueda(contactos, mensaje) {
+                if (contactos.length === 0) {
+                    resultadoBusqueda.className = 'alert alert-warning';
+                    resultadoBusqueda.innerHTML = mensaje;
+                    resultadoBusqueda.style.display = 'block';
+                    btnLimpiar.style.display = 'inline-block';
+                    btnBuscar.style.display = 'none';
+                    return;
+                }
+
+                // Mostrar mensaje de éxito
+                resultadoBusqueda.className = 'alert alert-success';
+                resultadoBusqueda.innerHTML = mensaje;
+                resultadoBusqueda.style.display = 'block';
+
+                // Actualizar tabla con resultados
+                let nuevaTabla = '';
+                contactos.forEach(contacto => {
+                    nuevaTabla += `
+                        <tr>
+                            <td>${contacto.origen || ''}</td>
+                            <td>${contacto.privadoDesregulado || ''}</td>
+                            <td>${contacto.apellido_nombre || ''}</td>
+                            <td>${contacto.correo_electronico || ''}</td>
+                            <td>${contacto.edad_titular || ''}</td>
+                            <td>${contacto.telefono || ''}</td>
+                            <td>${contacto.grupo_familiar || ''}</td>
+                            <td>${contacto.cobertura_actual || ''}</td>
+                            <td>
+                                <div class="promocion-container" data-contacto-id="${contacto.id}">
+                                    <span class="promocion-text">${contacto.promocion}</span>
+                                </div>
+                            </td>
+                            <td>${contacto.plan_ofrecido || ''}</td>
+                            <td>
+                                <span class="badge ${getBadgeClass(contacto.estado)}">
+                                    ${contacto.estado}
+                                </span>
+                            </td>
+                            <td>${contacto.conyuge || ''}</td>
+                            <td>${contacto.conyuge_edad || ''}</td>
+                            <td>${contacto.fecha_carga}</td>
+                            <td>${contacto.observaciones || ''}</td>
+                        </tr>
+                    `;
+                });
+
+                tablaContactos.innerHTML = nuevaTabla;
+                btnLimpiar.style.display = 'inline-block';
+                btnBuscar.style.display = 'none';
+            }
+
+            function getBadgeClass(estado) {
+                switch(estado) {
+                    case 'abierto': return 'badge-abierto';
+                    case 'vendido': return 'badge-vendido';
+                    case 'no responde': return 'badge-no-responde';
+                    case 'cerrado': return 'badge-cerrado';
+                    default: return 'badge-secondary';
                 }
             }
         });
