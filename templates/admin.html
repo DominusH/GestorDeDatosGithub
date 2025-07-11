@@ -241,27 +241,21 @@
                 </a>
             </div>
             <div class="card-body">
-                <!-- Buscador -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="input-group">
-                            <input type="email" class="form-control" id="buscarEmail" placeholder="Buscar por email...">
-                            <button class="btn btn-primary" type="button" id="btnBuscar">
-                                <i class="fas fa-search me-2"></i>
-                                Buscar
-                            </button>
-                            <button class="btn btn-secondary" type="button" id="btnLimpiar" style="display: none;">
-                                <i class="fas fa-times me-2"></i>
-                                Limpiar
-                            </button>
-                        </div>
-                        <!-- Campo CSRF oculto para el buscador -->
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    </div>
-                    <div class="col-md-6">
-                        <div id="resultadoBusqueda" class="alert" style="display: none;"></div>
-                    </div>
+                <!-- Solo búsqueda por nombre/apellido -->
+                <div class="input-group mb-2">
+                    <input type="text" class="form-control" id="buscarNombre" placeholder="Buscar por nombre o apellido...">
+                    <button class="btn btn-primary" type="button" id="btnBuscarNombre">
+                        <i class="fas fa-search me-2"></i>
+                        Buscar
+                    </button>
+                    <button class="btn btn-secondary" type="button" id="btnLimpiarNombre" style="display: none;">
+                        <i class="fas fa-times me-2"></i>
+                        Limpiar
+                    </button>
                 </div>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div id="resultadoBusqueda" class="alert" style="display: none;"></div>
+            </div>
             <div class="card-body">
                 <div class="table-wrapper">
                     <table class="table table-hover align-middle">
@@ -323,56 +317,46 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Funcionalidad de búsqueda por email para admin
+        // Funcionalidad de búsqueda por nombre
         document.addEventListener('DOMContentLoaded', function() {
-            const buscarEmail = document.getElementById('buscarEmail');
-            const btnBuscar = document.getElementById('btnBuscar');
-            const btnLimpiar = document.getElementById('btnLimpiar');
+            const buscarNombre = document.getElementById('buscarNombre');
+            const btnBuscarNombre = document.getElementById('btnBuscarNombre');
+            const btnLimpiarNombre = document.getElementById('btnLimpiarNombre');
             const resultadoBusqueda = document.getElementById('resultadoBusqueda');
             const tablaContactos = document.querySelector('.table-wrapper table tbody');
             const tablaOriginal = tablaContactos.innerHTML;
 
-            // Buscar al presionar Enter
-            buscarEmail.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    buscarContactos();
-                }
+            btnBuscarNombre.addEventListener('click', buscarContactosPorNombre);
+            buscarNombre.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') buscarContactosPorNombre();
             });
-
-            // Buscar al hacer clic en el botón
-            btnBuscar.addEventListener('click', buscarContactos);
-
-            // Limpiar búsqueda
-            btnLimpiar.addEventListener('click', function() {
-                buscarEmail.value = '';
+            btnLimpiarNombre.addEventListener('click', function() {
+                buscarNombre.value = '';
                 resultadoBusqueda.style.display = 'none';
                 tablaContactos.innerHTML = tablaOriginal;
-                btnLimpiar.style.display = 'none';
-                btnBuscar.style.display = 'inline-block';
+                btnLimpiarNombre.style.display = 'none';
+                btnBuscarNombre.style.display = 'inline-block';
+                
+                // Re-agregar event listeners a la tabla restaurada
+                agregarEventListenersATabla();
             });
 
-            function buscarContactos() {
-                const email = buscarEmail.value.trim();
-                
-                if (!email) {
-                    mostrarMensaje('Por favor ingrese un email para buscar', 'warning');
+            function buscarContactosPorNombre() {
+                const nombre = buscarNombre.value.trim();
+                if (!nombre) {
+                    mostrarMensaje('Por favor ingrese un nombre o apellido para buscar', 'warning');
                     return;
                 }
-
-                // Mostrar indicador de carga
-                btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Buscando...';
-                btnBuscar.disabled = true;
-
-                // Obtener el token CSRF del campo oculto del buscador
-                const csrfToken = btnBuscar.closest('.col-md-6').querySelector('input[name="csrf_token"]').value;
-
-                fetch('/buscar_contactos_por_email', {
+                btnBuscarNombre.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Buscando...';
+                btnBuscarNombre.disabled = true;
+                const csrfToken = btnBuscarNombre.closest('.input-group').parentNode.querySelector('input[name="csrf_token"]').value;
+                fetch('/buscar_contactos_por_nombre', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': csrfToken
                     },
-                    body: `email=${encodeURIComponent(email)}&csrf_token=${csrfToken}`
+                    body: `nombre=${encodeURIComponent(nombre)}&csrf_token=${csrfToken}`
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -387,9 +371,8 @@
                     mostrarMensaje('Error al realizar la búsqueda', 'danger');
                 })
                 .finally(() => {
-                    // Restaurar botón
-                    btnBuscar.innerHTML = '<i class="fas fa-search me-2"></i>Buscar';
-                    btnBuscar.disabled = false;
+                    btnBuscarNombre.innerHTML = '<i class="fas fa-search me-2"></i>Buscar';
+                    btnBuscarNombre.disabled = false;
                 });
             }
 
@@ -398,17 +381,13 @@
                     resultadoBusqueda.className = 'alert alert-warning';
                     resultadoBusqueda.innerHTML = mensaje;
                     resultadoBusqueda.style.display = 'block';
-                    btnLimpiar.style.display = 'inline-block';
-                    btnBuscar.style.display = 'none';
+                    btnLimpiarNombre.style.display = 'inline-block';
+                    btnBuscarNombre.style.display = 'none';
                     return;
                 }
-
-                // Mostrar mensaje de éxito
                 resultadoBusqueda.className = 'alert alert-success';
                 resultadoBusqueda.innerHTML = mensaje;
                 resultadoBusqueda.style.display = 'block';
-
-                // Actualizar tabla con resultados
                 let nuevaTabla = '';
                 contactos.forEach(contacto => {
                     nuevaTabla += `
@@ -436,10 +415,13 @@
                         </tr>
                     `;
                 });
-
                 tablaContactos.innerHTML = nuevaTabla;
-                btnLimpiar.style.display = 'inline-block';
-                btnBuscar.style.display = 'none';
+                
+                // Agregar event listeners a los nuevos elementos
+                agregarEventListenersATabla();
+                
+                btnLimpiarNombre.style.display = 'inline-block';
+                btnBuscarNombre.style.display = 'none';
             }
 
             function getBadgeClass(estado) {
@@ -451,6 +433,36 @@
                     default: return 'badge-secondary';
                 }
             }
+
+            // Función para agregar event listeners a la tabla (tanto original como de búsqueda)
+            function agregarEventListenersATabla() {
+                // En la vista de admin, agregamos event listeners básicos
+                // para futuras funcionalidades como tooltips, hover effects, etc.
+                
+                // Agregar tooltips a los badges de estado si Bootstrap está disponible
+                const badges = document.querySelectorAll('.badge');
+                badges.forEach(badge => {
+                    if (badge.textContent.trim()) {
+                        badge.title = `Estado: ${badge.textContent.trim()}`;
+                    }
+                });
+                
+                // Agregar hover effects a las filas de la tabla
+                const filas = document.querySelectorAll('.table tbody tr');
+                filas.forEach(fila => {
+                    fila.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                    });
+                    fila.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '';
+                    });
+                });
+                
+                console.log('Event listeners agregados a la tabla de admin');
+            }
+
+            // Llamar a la función al cargar la página para la tabla original
+            agregarEventListenersATabla();
 
             function mostrarMensaje(mensaje, tipo) {
                 const alertDiv = document.createElement('div');

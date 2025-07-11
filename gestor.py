@@ -1117,6 +1117,55 @@ def buscar_contactos_por_email():
         logging.error(f"Error al buscar contactos por email: {str(e)}")
         return jsonify({'success': False, 'message': 'Error al realizar la búsqueda'})
 
+@gestor.route('/buscar_contactos_por_nombre', methods=['POST'])
+@login_required
+def buscar_contactos_por_nombre():
+    try:
+        nombre = request.form.get('nombre', '').strip()
+        if not nombre:
+            return jsonify({'success': False, 'message': 'Por favor ingrese un nombre o apellido para buscar'})
+        
+        if current_user.is_admin:
+            contactos = Contacto.query.filter(
+                Contacto.apellido_nombre.ilike(f'%{nombre}%')
+            ).all()
+        else:
+            contactos = Contacto.query.filter(
+                Contacto.apellido_nombre.ilike(f'%{nombre}%'),
+                Contacto.usuario_id == current_user.id
+            ).all()
+        
+        datos_contactos = []
+        for c in contactos:
+            datos_contactos.append({
+                'id': c.id,
+                'origen': c.origen,
+                'privadoDesregulado': c.privadoDesregulado,
+                'apellido_nombre': c.apellido_nombre,
+                'correo_electronico': c.correo_electronico,
+                'edad_titular': c.edad_titular,
+                'telefono': c.telefono,
+                'grupo_familiar': c.grupo_familiar,
+                'cobertura_actual': c.cobertura_actual,
+                'promocion': c.promocion or 'No especificado',
+                'plan_ofrecido': c.plan_ofrecido,
+                'estado': c.estado,
+                'conyuge': c.conyuge,
+                'conyuge_edad': c.conyuge_edad,
+                'fecha_carga': c.created_at.strftime('%d/%m/%Y') if c.created_at else 'N/A',
+                'observaciones': c.observaciones,
+                'usuario_email': c.usuario.email if current_user.is_admin else None
+            })
+        return jsonify({
+            'success': True,
+            'contactos': datos_contactos,
+            'total': len(datos_contactos),
+            'message': f'Se encontraron {len(datos_contactos)} contacto(s) con el nombre "{nombre}"'
+        })
+    except Exception as e:
+        logging.error(f"Error al buscar contactos por nombre: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error al realizar la búsqueda'})
+
 if __name__ == '__main__':
     # Solo ejecutar en desarrollo local, no en PythonAnywhere
     import socket
